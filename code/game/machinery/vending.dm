@@ -1127,7 +1127,8 @@
 					/obj/item/toy/plushie/face_hugger = 1,
 					/obj/item/toy/plushie/carp = 1,
 					/obj/item/toy/plushie/deer = 1,
-					/obj/item/toy/plushie/tabby_cat = 1)
+					/obj/item/toy/plushie/tabby_cat = 1,
+          /obj/item/weapon/pen/crayon = 5)
 	premium = list(/obj/item/weapon/reagent_containers/food/drinks/bottle/champagne = 1,
 					/obj/item/weapon/storage/trinketbox = 2)
 	prices = list(/obj/item/weapon/storage/fancy/heartbox = 15,
@@ -1156,7 +1157,8 @@
 					/obj/item/toy/plushie/face_hugger = 50,
 					/obj/item/toy/plushie/carp = 50,
 					/obj/item/toy/plushie/deer = 50,
-					/obj/item/toy/plushie/tabby_cat = 50)
+					/obj/item/toy/plushie/tabby_cat = 50
+          /obj/item/weapon/pen/crayon = 10)
 
 
 // Clothing dispensers
