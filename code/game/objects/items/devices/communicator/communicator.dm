@@ -4,6 +4,19 @@
 
 var/global/list/obj/item/device/communicator/all_communicators = list()
 
+// List of core tabs the communicator can switch to
+#define HOMETAB 1
+#define PHONTAB 2
+#define CONTTAB 3
+#define MESSTAB 4
+#define NEWSTAB 5
+#define NOTETAB 6
+#define WTHRTAB 7
+#define MANITAB 8
+#define SETTTAB 9
+#define EXTRTAB 10
+#define HOTLINETAB 11
+
 /obj/item/device/communicator
 	name = "communicator"
 	desc = "A personal device used to enable long range dialog between two people, utilizing existing telecommunications infrastructure to allow \
@@ -33,21 +46,25 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 
 	var/obj/item/weapon/card/id/id = null //add the ID slot
 
-	var/obj/item/weapon/cartridge/cartridge = null //current cartridge
+	// var/obj/item/weapon/commcard/cartridge = null //current cartridge
+
 	var/fon = 0 // Internal light
 	var/flum = 2 // Brightness
 
 	var/list/modules = list(
-							list("module" = "Phone", "icon" = "phone64", "number" = 2),
-							list("module" = "Contacts", "icon" = "person64", "number" = 3),
-							list("module" = "Messaging", "icon" = "comment64", "number" = 4),
-							list("module" = "Note", "icon" = "note64", "number" = 5),
-							list("module" = "Weather", "icon" = "sun64", "number" = 6),
-							list("module" = "Settings", "icon" = "gear64", "number" = 7),
-							list("module" = "Emergency Hotline", "icon" = "service64", "number" = 8)
+							list("module" = "Phone", "icon" = "phone64", "number" = PHONTAB),
+							list("module" = "Contacts", "icon" = "person64", "number" = CONTTAB),
+							list("module" = "Messaging", "icon" = "comment64", "number" = MESSTAB),
+							list("module" = "News", "icon" = "note64", "number" = NEWSTAB), // Need a different icon,
+							list("module" = "Note", "icon" = "note64", "number" = NOTETAB),
+							list("module" = "Weather", "icon" = "sun64", "number" = WTHRTAB),
+							list("module" = "Crew Manifest", "icon" = "note64", "number" = MANITAB), // Need a different icon,
+							list("module" = "Settings", "icon" = "gear64", "number" = SETTTAB),
+							list("module" = "Emergency Hotline", "icon" = "service64", "number" = HOTLINETAB)
+
 							)	//list("module" = "Name of Module", "icon" = "icon name64", "number" = "what tab is the module")
 
-	var/selected_tab = 1
+	var/selected_tab = HOMETAB
 	var/owner = ""
 	var/occupation = ""
 	var/alert_called = 0
@@ -93,7 +110,7 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 /obj/item/device/communicator/examine(mob/user)
 	. = ..(user, 1)
 	if(. && video_source)
-		user << "<span class='notice'>It looks like it's on a video call: <a href='?src=\ref[src];watchvideo=1'>\[view\]</a></span>"
+		to_chat(user, "<span class='notice'>It looks like it's on a video call: <a href='?src=\ref[src];watchvideo=1'>\[view\]</a></span>")
 
 // Proc: initialize_exonet()
 // Parameters: 1 (user - the person the communicator belongs to)
@@ -134,7 +151,7 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 		else
 			msg += "<span class='notice'>The device doesn't appear to be transmitting any data.</span>\n"
 		msg += "</span>"
-	user << msg
+	to_chat(user, msg)
 	return
 
 // Proc: emp_act()
@@ -192,6 +209,17 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 		if(!get_connection_to_tcomms())
 			close_connection(reason = "Connection timed out")
 
+// Proc: attack()
+// Parameters: 2 (M - what is being attacked. user - the mob that has the communicator)
+// Description: When the communicator has an attached commcard with internal devices, relay the attack() through to those devices.
+// 		Contents of the for loop are copied from gripper code, because that does approximately what we want to do.
+// /obj/item/device/communicator/attack(mob/living/carbon/M as mob, mob/living/carbon/user as mob)
+//	if(cartridge && cartridge.active_devices)
+//		for(var/obj/item/wrapped in cartridge.active_devices)
+//			if(wrapped) 	//The force of the wrapped obj gets set to zero during the attack() and afterattack().
+//				wrapped.attack(M,user)
+	return 0
+
 // Proc: attackby()
 // Parameters: 2 (C - what is used on the communicator. user - the mob that has the communicator)
 // Description: When an ID is swiped on the communicator, the communicator reads the job and checks it against the Owner name, if success, the occupation is added.
@@ -211,12 +239,7 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 					updateSelfDialog()//Update self dialog on success.
 			return
 		updateSelfDialog()
-//	else if(istype(C, /obj/item/weapon/cartridge))
-//		if(cartridge)
-//			to_chat(user, "<span class='notice'>\The [src] already has an external device attached!</span>")
-//		else
-//			modules.Add(list("module" = "External Device", "icon = external64", "number" = 8))
-//			cartridge = C
+
 	else if(istype(C, /obj/item/weapon/pen))
 		var/obj/item/weapon/pen/O = locate() in src
 		if(O)
@@ -225,6 +248,14 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 			user.drop_item()
 			C.loc = src
 			to_chat(user, "<span class='notice'>You slot \the [C] into \the [src].</span>")
+
+	else if(istype(C, /obj/item/weapon/commcard) && !cartridge)
+		cartridge = C
+		user.drop_item()
+		cartridge.forceMove(src)
+		to_chat(usr, "<span class='notice'>You slot \the [cartridge] into \the [src].</span>")
+		modules[++modules.len] = list("module" = "External Device", "icon" = "external64", "number" = EXTRTAB)
+		nanomanager.update_uis(src) // update all UIs attached to src
 	return
 
 // Proc: attack_self()
@@ -314,10 +345,9 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 
 	//Clean up references that might point at us
 	all_communicators -= src
-	processing_objects -= src
 	listening_objects.Remove(src)
-	qdel_null(camera)
-	qdel_null(exonet)
+	qdel(camera)
+	qdel(exonet)
 
 	return ..()
 
@@ -347,6 +377,38 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 	..()
 	client_huds |= global_hud.whitense
 	client_huds |= global_hud.darkMask
+
+/obj/item/device/communicator/verb/verb_remove_cartridge()
+	set category = "Object"
+	set name = "Remove commcard"
+	set src in usr
+
+	// Can't remove what isn't there
+	if(!cartridge)
+		to_chat(usr, "<span class='notice'>There isn't a commcard to remove!</span>")
+		return
+
+	// Can't remove if you're physically unable to
+	if(usr.stat || usr.restrained() || usr.paralysis || usr.stunned || usr.weakened)
+		to_chat(usr, "<span class='notice'>You cannot do this while restrained.</span>")
+		return
+
+	var/turf/T = get_turf(src)
+	cartridge.loc = T
+	// If it's in someone, put the cartridge in their hands
+	if (ismob(loc))
+		var/mob/M = loc
+		M.put_in_hands(cartridge)
+	// Else just set it on the ground
+	else
+		cartridge.loc = get_turf(src)
+	cartridge = null
+	// We have to iterate through the modules to find EXTRTAB, because list procs don't play nice with a list of lists
+	for(var/i = 1, i <= modules.len, i++)
+		if(modules[i]["number"] == EXTRTAB)
+			modules.Cut(i, i+1)
+			break
+	to_chat(usr, "<span class='notice'>You remove \the [cartridge] from the [name].</span>")
 
 //It's the 26th century. We should have smart watches by now.
 /obj/item/device/communicator/watch
