@@ -31,6 +31,8 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 	var/note = "Thank you for choosing the T-14.2 Communicator, this is your notepad!" //Current note in the notepad function
 	var/notehtml = ""
 
+	var/obj/item/weapon/card/id/id = null
+
 	var/obj/item/weapon/cartridge/cartridge = null //current cartridge
 	var/fon = 0 // Internal light
 	var/flum = 2 // Brightness
@@ -73,6 +75,7 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 	camera = new(src)
 	camera.name = "[src] #[rand(100,999)]"
 	camera.c_tag = camera.name
+	new /obj/item/weapon/pen(src)
 	//This is a pretty terrible way of doing this.
 	spawn(5 SECONDS) //Wait for our mob to finish spawning.
 		if(ismob(loc))
@@ -193,21 +196,36 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 // Parameters: 2 (C - what is used on the communicator. user - the mob that has the communicator)
 // Description: When an ID is swiped on the communicator, the communicator reads the job and checks it against the Owner name, if success, the occupation is added.
 /obj/item/device/communicator/attackby(obj/item/C as obj, mob/user as mob)
+	..()
 	if(istype(C, /obj/item/weapon/card/id))
 		var/obj/item/weapon/card/id/idcard = C
 		if(!idcard.registered_name || !idcard.assignment)
 			to_chat(user, "<span class='notice'>\The [src] rejects the ID.</span>")
-		else if(!owner)
-			to_chat(user, "<span class='notice'>\The [src] rejects the ID.</span>")
-		else if(owner == idcard.registered_name)
-			occupation = idcard.assignment
+			return
+		if(!owner)
+			owner = idcard.registered_name
 			to_chat(user, "<span class='notice'>Occupation updated.</span>")
+		else
+			if(((src in user.contents) && (C in user.contents)) || (istype(loc, /turf) && in_range(src, user) && (C in user.contents)) )
+				if(id_check(user, 2))
+					to_chat(user, "<span class='notice'>You put the ID into \the [src]'s slot.</span>")
+					updateSelfDialog()//Update self dialog on success.
+  		return
+		updateSelfDialog()
 //	else if(istype(C, /obj/item/weapon/cartridge))
 //		if(cartridge)
 //			to_chat(user, "<span class='notice'>\The [src] already has an external device attached!</span>")
 //		else
 //			modules.Add(list("module" = "External Device", "icon = external64", "number" = 8))
 //			cartridge = C
+	else if(istype(C, /obj/item/weapon/pen))
+		var/obj/item/weapon/pen/O = locate() in src
+		if(O)
+			to_chat(user, "<span class='notice'>There is already a pen in \the [src].</span>")
+		else
+			user.drop_item()
+			C.loc = src
+			to_chat(user, "<span class='notice'>You slot \the [C] into \the [src].</span>")
 	return
 
 // Proc: attack_self()
@@ -355,3 +373,118 @@ var/global/list/obj/item/device/communicator/all_communicators = list()
 
 	icon_state = initial(icon_state)
 
+//Id slot
+
+/obj/item/device/communicator/proc/can_use()
+
+	if(!ismob(loc))
+		return 0
+
+	var/mob/M = loc
+	if(M.stat || M.restrained() || M.paralysis || M.stunned || M.weakened)
+		return 0
+	if((src in M.contents) || ( istype(loc, /turf) && in_range(src, M) ))
+		return 1
+	else
+		return 0
+
+/obj/item/device/communicator/proc/remove_id()
+	if (id)
+		if (ismob(loc))
+			var/mob/M = loc
+			M.put_in_hands(id)
+			to_chat(usr, "<span class='notice'>You remove the ID from the [name].</span>")
+		else
+			id.loc = get_turf(src)
+		id = null
+
+/obj/item/device/communicator/AltClick()
+	if(issilicon(usr))
+		return
+
+	if ( can_use(usr) )
+		if(id)
+			remove_id()
+		else
+			to_chat(usr, "<span class='notice'>This communicator does not have an ID in it.</span>")
+
+/obj/item/device/communicator/GetAccess()
+	if(id)
+		return id.GetAccess()
+	else
+		return ..()
+
+/obj/item/device/communicator/GetID()
+	return id
+
+/obj/item/device/communicator/verb/verb_remove_id()
+	set category = "Object"
+	set name = "Remove id"
+	set src in usr
+
+	if(issilicon(usr))
+		return
+
+	if ( can_use(usr) )
+		if(id)
+			remove_id()
+		else
+			to_chat(usr, "<span class='notice'>This communicator does not have an ID in it.</span>")
+	else
+		to_chat(usr, "<span class='notice'>You cannot do this while restrained.</span>")
+
+/obj/item/device/communicator/proc/id_check(mob/user as mob, choice as num)//To check for IDs; 1 for in-pda use, 2 for out of pda use.
+	if(choice == 1)
+		if (id)
+			remove_id()
+			return 1
+		else
+			var/obj/item/I = user.get_active_hand()
+			if (istype(I, /obj/item/weapon/card/id) && user.unEquip(I))
+				I.loc = src
+				id = I
+			return 1
+	else
+		var/obj/item/weapon/card/I = user.get_active_hand()
+		if (istype(I, /obj/item/weapon/card/id) && I:registered_name && user.unEquip(I))
+			var/obj/old_id = id
+			I.loc = src
+			id = I
+			user.put_in_hands(old_id)
+			return 1
+	return 0
+
+/obj/item/device/communicator/Destroy()
+	all_communicators -= src
+	if (src.id && prob(90)) //IDs are kept in 90% of the cases
+		src.id.forceMove(get_turf(src.loc))
+	else
+		qdel_null(src.id)
+	return ..()
+
+
+
+// Pen !
+
+/obj/item/device/communicator/verb/verb_remove_pen()
+	set category = "Object"
+	set name = "Remove pen"
+	set src in usr
+
+	if(issilicon(usr))
+		return
+
+	if ( can_use(usr) )
+		var/obj/item/weapon/pen/O = locate() in src
+		if(O)
+			if (istype(loc, /mob))
+				var/mob/M = loc
+				if(M.get_active_hand() == null)
+					M.put_in_hands(O)
+					to_chat(usr, "<span class='notice'>You remove \the [O] from \the [src].</span>")
+					return
+			O.loc = get_turf(src)
+		else
+			to_chat(usr, "<span class='notice'>This communicator does not have a pen in it.</span>")
+	else
+		to_chat(usr, "<span class='notice'>You cannot do this while restrained.</span>")
