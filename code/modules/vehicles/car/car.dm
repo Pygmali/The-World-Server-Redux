@@ -135,7 +135,8 @@
 // Boarding.
 /obj/vehicle/car/MouseDrop_T(var/atom/movable/C, mob/user)
 	if(ismob(C))
-		user_buckle_mob(C, user)
+		if(do_after(C, 10))
+			user_buckle_mob(C, user)
 	else
 		..(C, user)
 
@@ -223,4 +224,3 @@
 
 /obj/vehicle/car/proc/honk_horn()
 	playsound(src, horn_sound,40,1)
-
